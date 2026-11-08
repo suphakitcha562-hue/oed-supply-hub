@@ -17,6 +17,9 @@
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
 
+  <!-- SheetJS สำหรับ Export เป็นไฟล์ Excel (.xlsx) ของแท้ -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
   <style>
     body { font-family: 'Sarabun', sans-serif; }
     .no-scrollbar::-webkit-scrollbar { display: none; }
@@ -24,15 +27,15 @@
   </style>
 
   <script>
-    // การตั้งค่า Firebase ของโปรเจกต์ OED Office Supplies Inventory
-    const firebaseConfig = {
-      apiKey: "AIzaSyDWbPhrbNRu4uqNltocOUGJLJGMyEiMPyc",
-      authDomain: "oed-office-supplies-inve-7e082.firebaseapp.com",
-      projectId: "oed-office-supplies-inve-7e082",
-      storageBucket: "oed-office-supplies-inve-7e082.firebasestorage.app",
-      messagingSenderId: "262342434170",
-      appId: "1:262342434170:web:5e48e1d6b51261e8ce4ac3"
-    };
+    // 🔴 🔴 🔴 นำค่า firebaseConfig ของคุณมาใส่ตรงนี้ 🔴 🔴 🔴
+ const firebaseConfig = {
+  apiKey: "AIzaSyDWbPhrbNRu4uqNltocOUGJLJGMyEiMPyc",
+  authDomain: "oed-office-supplies-inve-7e082.firebaseapp.com",
+  projectId: "oed-office-supplies-inve-7e082",
+  storageBucket: "oed-office-supplies-inve-7e082.firebasestorage.app",
+  messagingSenderId: "262342434170",
+  appId: "1:262342434170:web:5e48e1d6b51261e8ce4ac3"
+};
 
     // Initialize Firebase
     if (!firebase.apps.length) {
@@ -89,9 +92,8 @@
       const [transactions, setTransactions] = useState([]);
       const [monthlyBudget, setMonthlyBudget] = useState(10000);
       
-      // State เพื่อเช็กว่ากำลังโหลดข้อมูลจากฐานข้อมูลอยู่หรือไม่
       const [isLoading, setIsLoading] = useState(true);
-      const [dbError, setDbError] = useState(false); // เช็ก error
+      const [dbError, setDbError] = useState(false);
 
       const [activeTab, setActiveTab] = useState("stock");
       const [searchTerm, setSearchTerm] = useState("");
@@ -128,16 +130,12 @@
         id: "", name: "", category: "กระดาษและสิ่งพิมพ์", stock: 0, reorder: 5, unit: "ชิ้น", price: 0, location: "", image: "", receivedDate: today 
       });
 
-      // 🟢 เชื่อมต่อ Firebase Real-time Listener 🟢
       useEffect(() => {
         setIsLoading(true);
-        // ฟังข้อมูล Inventory
         const unsubInv = db.collection("inventory").onSnapshot(
           (snapshot) => {
             const items = [];
             snapshot.forEach((doc) => items.push({ ...doc.data(), docId: doc.id }));
-            
-            // เรียงลำดับข้อมูลตามรหัส (AA001, BB001) ก่อนนำไปแสดงผล
             items.sort((a, b) => a.id.localeCompare(b.id));
             setInventory(items);
             setIsLoading(false);
@@ -149,7 +147,6 @@
           }
         );
 
-        // ฟังข้อมูล Transactions เรียงตามเวลาล่าสุด
         const unsubTxn = db.collection("transactions").orderBy("timestamp", "desc").onSnapshot(
           (snapshot) => {
             const txns = [];
@@ -159,7 +156,6 @@
           (error) => console.error("Firestore txn error: ", error)
         );
 
-        // ฟังค่างบประมาณ
         const unsubBudget = db.collection("settings").doc("budget").onSnapshot((doc) => {
           if (doc.exists) {
             setMonthlyBudget(doc.data().amount);
@@ -170,7 +166,6 @@
         return () => { unsubInv(); unsubTxn(); unsubBudget(); };
       }, []);
 
-      // 🟢 ฟังก์ชันบันทึกอุปกรณ์ใหม่/แก้ไข ลง Firebase 🟢
       const handleSaveItem = async (e) => {
         e.preventDefault();
         const trimmedId = formData.id.trim().toUpperCase();
@@ -219,7 +214,6 @@
         }
       };
 
-      // 🟢 ฟังก์ชันรับเข้า/เบิกออก ลง Firebase 🟢
       const handleTransactionSubmit = async (e) => {
         e.preventDefault();
         const qty = Number(actionQty);
@@ -231,7 +225,6 @@
         const newStock = actionType === "in" ? selectedItem.stock + qty : selectedItem.stock - qty;
         
         try {
-          // อัปเดตสต็อก
           await db.collection("inventory").doc(selectedItem.docId).update({
             stock: newStock,
             price: actionType === "in" && pPrice > 0 ? pPrice : selectedItem.price,
@@ -241,7 +234,6 @@
           const chosenDate = new Date(actionDate);
           const formattedDate = isNaN(chosenDate) ? new Date().toLocaleString("th-TH") : (chosenDate.toLocaleDateString("th-TH") + " " + chosenDate.toLocaleTimeString("th-TH", { hour: '2-digit', minute: '2-digit' }) + " น.");
           
-          // บันทึกประวัติ
           await db.collection("transactions").add({
             timestamp: actionDate,
             dateStr: formattedDate,
@@ -263,7 +255,6 @@
         }
       };
 
-      // 🟢 ฟังก์ชันลบประวัติ ลง Firebase 🟢
       const handleDeleteTransaction = async (txnId) => {
         const txnToDelete = transactions.find(t => t.docId === txnId);
         if (!txnToDelete) return;
@@ -293,6 +284,36 @@
         }
       };
 
+      // 🟢 ฟังก์ชันส่งออกเป็นไฟล์ Excel 🟢
+      const handleDownloadExcel = () => {
+        if (inventory.length === 0) {
+          alert("ยังไม่มีข้อมูลอุปกรณ์ในคลังให้ดาวน์โหลด");
+          return;
+        }
+
+        // จัดเตรียมข้อมูลสำหรับ Excel
+        const exportData = inventory.map(item => ({
+          "รหัสอุปกรณ์ (ID)": item.id,
+          "ชื่ออุปกรณ์": item.name,
+          "หมวดหมู่": item.category,
+          "จำนวนคงเหลือ": Number(item.stock),
+          "หน่วยนับ": item.unit,
+          "ราคาต่อหน่วย (บาท)": Number(item.price),
+          "มูลค่ารวม (บาท)": Number(item.stock) * Number(item.price),
+          "จุดเตือนสั่งซื้อ": Number(item.reorder),
+          "สถานที่จัดเก็บ": item.location || "-",
+          "วันที่นำเข้าล่าสุด": item.receivedDate ? new Date(item.receivedDate).toLocaleDateString("th-TH") : "-"
+        }));
+
+        // สร้าง Sheet และ Workbook ด้วยไลบรารี XLSX
+        const worksheet = XLSX.utils.json_to_sheet(exportData);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "ข้อมูลสต็อกอุปกรณ์");
+        
+        // สั่งดาวน์โหลดไฟล์
+        const dateStr = new Date().toISOString().slice(0, 10);
+        XLSX.writeFile(workbook, `OED_Inventory_Report_${dateStr}.xlsx`);
+      };
 
       // KPI Calculations
       const kpiInventory = kpiCategory === "ทั้งหมด" ? inventory : inventory.filter(i => i.category === kpiCategory);
@@ -379,7 +400,6 @@
         });
       }, [transactions, inventory, txnFilterCategory, txnSearchTerm]);
 
-
       const handleImageUpload = (e) => {
         const file = e.target.files[0];
         if (!file) return;
@@ -401,23 +421,6 @@
         setFormData(prev => ({ ...prev, category: newCat, id: isEditing ? prev.id : generateNextId(newCat, inventory) }));
       };
 
-      const handleDownloadCSV = () => {
-        let csvContent = "\uFEFFรหัสอุปกรณ์ (ID),ชื่ออุปกรณ์,หมวดหมู่,จำนวนคงเหลือ,ราคาต่อหน่วย,มูลค่ารวม,จุดเตือนสั่งซื้อ,หน่วยนับ,สถานที่จัดเก็บ,วันที่นำเข้าล่าสุด\n";
-        inventory.forEach(item => {
-          const totalVal = item.stock * item.price;
-          csvContent += `"${item.id}","${item.name}","${item.category}",${item.stock},${item.price},${totalVal},${item.reorder},"${item.unit}","${item.location || '-'}","${item.receivedDate || '-'}"\n`;
-        });
-        const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.setAttribute("href", url);
-        link.setAttribute("download", `รายงานคลังอุปกรณ์_${new Date().toISOString().slice(0, 10)}.csv`);
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-      };
-
-      // 🟢 หน้าจอ Loading ตอนดึงข้อมูล 🟢
       if (isLoading) {
         return (
           <div class="min-h-screen flex flex-col items-center justify-center bg-slate-50 gap-4">
@@ -480,12 +483,17 @@
             <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
               <div class="p-4 border-b border-slate-100 flex flex-col sm:flex-row gap-3 justify-between items-center bg-slate-50/50">
                 <input type="text" placeholder="ค้นหาชื่ออุปกรณ์, รหัสอุปกรณ์..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} class="w-full sm:w-80 px-4 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white" />
-                <div class="flex items-center gap-2 w-full sm:w-auto">
+                <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
                   <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)} class="px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none">
                     <option value="ทั้งหมด">หมวดหมู่ทั้งหมด</option>
                     {Object.keys(categoryPrefixMap).map(cat => <option key={cat} value={cat}>{cat}</option>)}
                   </select>
                   <button onClick={() => setOnlyLowStock(!onlyLowStock)} class={`px-3 py-2 rounded-xl text-xs font-medium border transition ${onlyLowStock ? "bg-rose-50 border-rose-200 text-rose-700 font-bold" : "bg-white border-slate-200 text-slate-600"}`}>⚠️ แสดงเฉพาะของใกล้หมด</button>
+                  
+                  {/* ปุ่มดาวน์โหลด Excel ใหม่อยู่ตรงนี้ครับ */}
+                  <button onClick={handleDownloadExcel} class="px-3 py-2 rounded-xl text-xs font-medium border transition bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100 whitespace-nowrap">
+                    📊 ดาวน์โหลด Excel
+                  </button>
                 </div>
               </div>
               <div class="overflow-x-auto">
